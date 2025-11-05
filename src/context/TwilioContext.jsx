@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import PropTypes from "prop-types";
 import twilioClient from "../lib/twilioClient";
 import { useAuth } from "./AuthContext";
+import axios from "axios";
 
 const ONLINE_KEY = "__booking_online";
 
@@ -16,8 +17,12 @@ export function TwilioProvider({ children }) {
   const [callerNumber, setCallerNumber] = useState("");
   const [clientInfo, setClientInfo] = useState(null);
   const [callSeconds, setCallSeconds] = useState(0);
+  const [participantAdded, setParticipantAdded] = useState(false);
+  const [clientInfoLoading, setClientInfoLoading] = useState(false);
+  const [clientCallSid, setClientCallSid] = useState(null);
 
   const unsubscribers = useRef([]);
+  const clientInfoTimer = useRef(null);
 
   // Derived display for duration if needed by consumers
   const callTimeStr = useMemo(() => {
@@ -36,6 +41,10 @@ export function TwilioProvider({ children }) {
       setCallerNumber("");
       setClientInfo(null);
       setCallSeconds(0);
+      setParticipantAdded(false);
+      setClientInfoLoading(false);
+      setClientCallSid(null);
+      if (clientInfoTimer.current) { try { clearTimeout(clientInfoTimer.current); } catch {} clientInfoTimer.current = null; }
       unsubscribers.current.forEach((u) => { try { u(); } catch {} });
       unsubscribers.current = [];
       try { sessionStorage.removeItem(ONLINE_KEY); } catch {}
@@ -51,6 +60,7 @@ export function TwilioProvider({ children }) {
     const offIncoming = twilioClient.on("incoming", (conn) => {
       setHasIncoming(true);
       setAccepted(false);
+      setParticipantAdded(false);
       try {
         const p = conn && conn.parameters ? conn.parameters : {};
         const num = p.From || p.from || p.Caller || p.caller || "";
@@ -60,42 +70,99 @@ export function TwilioProvider({ children }) {
       }
     });
 
-    const resetAll = () => {
+    const clearCallState = () => {
       setAccepted(false);
       setHasIncoming(false);
       setCallerNumber("");
       setClientInfo(null);
       setCallSeconds(0);
-      setIsOnline(false); // triggers full cleanup path
+      setParticipantAdded(false);
+      setClientInfoLoading(false);
+      setClientCallSid(null);
+      if (clientInfoTimer.current) { try { clearTimeout(clientInfoTimer.current); } catch {} clientInfoTimer.current = null; }
     };
 
-    const offDisconnect = twilioClient.on("disconnect", resetAll);
-    const offOffline = twilioClient.on("offline", resetAll);
-    const offUnregistered = twilioClient.on("unregistered", resetAll);
+    // Only clear call state on real disconnects. Do not force offline.
+    const offDisconnect = twilioClient.on("disconnect", clearCallState);
+    const offCancel = twilioClient.on("cancel", () => {
+      setHasIncoming(false);
+    });
+    // Offline/unregistered should not auto-end call; leave online flag alone.
+    const offOffline = twilioClient.on("offline", () => {});
+    const offUnregistered = twilioClient.on("unregistered", () => {});
 
-    const offConnect = twilioClient.on("connect", async (conn) => {
+    const offConnect = twilioClient.on("connect", (conn) => {
       setAccepted(true);
       try {
         const p = conn && conn.parameters ? conn.parameters : {};
         const sid = p.CallSid || p.callsid || p.callSid || "";
         if (!sid) return;
-        const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, '') || '';
-        const url = `${base}/Call/OnDemondClientData?ClientCallSid=${encodeURIComponent(sid)}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Client data fetch failed: ${res.status}`);
-        const data = await res.json();
-        setClientInfo(data || null);
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error("[TwilioContext] Failed to fetch client info", e);
-        setClientInfo(null);
-      }
+        setClientCallSid(sid);
+        setClientInfoLoading(true);
+        if (clientInfoTimer.current) { try { clearTimeout(clientInfoTimer.current); } catch {} }
+        clientInfoTimer.current = setTimeout(async () => {
+          try {
+            const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, '') || '';
+            const url1 = `${base}/Call/OnDemondClientData?ClientCallSid=${encodeURIComponent(sid)}`;
+            const url2 = `${base}/Call/OnDemandClientData?ClientCallSid=${encodeURIComponent(sid)}`;
+            let data = null;
+            try {
+              const r1 = await axios.get(url1, { withCredentials: true });
+              data = r1.data;
+            } catch (e) {
+              try {
+                const r2 = await axios.get(url2, { withCredentials: true });
+                data = r2.data;
+              } catch (e2) {
+                // Last attempt: try without /Call prefix
+                const alt1 = `${base}/OnDemondClientData?ClientCallSid=${encodeURIComponent(sid)}`;
+                const alt2 = `${base}/OnDemandClientData?ClientCallSid=${encodeURIComponent(sid)}`;
+                try {
+                  const rA = await axios.get(alt1, { withCredentials: true });
+                  data = rA.data;
+                } catch (e3) {
+                  const rB = await axios.get(alt2, { withCredentials: true });
+                  data = rB.data;
+                }
+              }
+            }
+            if (data && Object.keys(data || {}).length > 0) {
+              console.log("[TwilioContext] Client info fetched after delay", { sid, data });
+              setClientInfo(data);
+            } else {
+              const fallback = {
+                bookingRef: p.bookingRef || p.bookingReference || null,
+                language: p.language || p.preferredLanguage || null,
+              };
+              console.log("[TwilioContext] Client info empty; using fallback from connection params", { sid, fallback });
+              setClientInfo(fallback);
+            }
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error("[TwilioContext] Failed to fetch client info", e);
+            try {
+              const p2 = conn && conn.parameters ? conn.parameters : {};
+              const fallback = {
+                bookingRef: p2.bookingRef || p2.bookingReference || null,
+                language: p2.language || p2.preferredLanguage || null,
+              };
+              console.log("[TwilioContext] Client info fetch failed; using fallback from connection params", { sid, fallback });
+              setClientInfo(fallback);
+            } catch {
+              setClientInfo(null);
+            }
+          } finally {
+            setClientInfoLoading(false);
+          }
+        }, 5000);
+      } catch {}
     });
 
     unsubscribers.current = [
       offRegistered,
       offIncoming,
       offDisconnect,
+      offCancel,
       offOffline,
       offUnregistered,
       offConnect,
@@ -202,6 +269,30 @@ export function TwilioProvider({ children }) {
     try { twilioClient.disconnectAll(); } catch {}
   }
 
+  function setHold(hold) {
+    try { twilioClient.setHold(hold); } catch {}
+  }
+
+  const callActive = twilioClient.isCallActive();
+
+  async function addParticipant(phoneNumber) {
+    try {
+      const bookingRef = (clientInfo && (clientInfo.bookingRef || clientInfo.bookingReference)) || null;
+      if (!bookingRef || !phoneNumber) throw new Error("Missing bookingRef or phoneNumber");
+      const apiBase = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
+      const addUrl = `${apiBase}/Call/AddParticipant?BookingRef=${encodeURIComponent(bookingRef)}&phoneNumber=${encodeURIComponent(phoneNumber)}`;
+      const res = await axios.post(addUrl, null, { withCredentials: true });
+      console.log("[TwilioContext] AddParticipant success", { status: res?.status, url: addUrl, bookingRef, phoneNumber });
+      setParticipantAdded(true);
+      return true;
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[TwilioContext] AddParticipant failed", e);
+      setParticipantAdded(false);
+      throw e;
+    }
+  }
+
   const value = {
     // state
     isOnline,
@@ -209,14 +300,19 @@ export function TwilioProvider({ children }) {
     accepted,
     callerNumber,
     clientInfo,
+    clientInfoLoading,
     callSeconds,
     callTimeStr,
+    participantAdded,
+    callActive,
     // actions
     goOnline,
     goOffline,
     acceptIncoming,
     connect,
     disconnectAll,
+    setHold,
+    addParticipant,
   };
 
   return (

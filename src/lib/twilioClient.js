@@ -136,7 +136,7 @@ class TwilioVoiceClient {
         };
         const onCancel = () => {
           console.log("[Twilio] Incoming call canceled");
-          this.emit("disconnect", conn);
+          this.emit("cancel", conn);
           if (this.activeConnection === conn) this.activeConnection = null;
           if (this.incoming === conn) this.incoming = null;
         };
@@ -151,7 +151,6 @@ class TwilioVoiceClient {
         conn.once && conn.once("cancel", onCancel);
         conn.on && conn.on("error", onError);
       } catch {}
-       debugger
     });
 
     this.device.on("connect", (conn) => {
@@ -169,7 +168,7 @@ class TwilioVoiceClient {
         };
         const onConnCancel = () => {
           console.log("[Twilio] Connection canceled");
-          this.emit("disconnect", conn);
+          this.emit("cancel", conn);
           if (this.activeConnection === conn) this.activeConnection = null;
         };
         conn.once && conn.once("disconnect", onConnDisconnect);
@@ -237,9 +236,22 @@ class TwilioVoiceClient {
   }
 
   connect(to) {
-    if (this.device && to) {
-      try { this.device.connect({ params: { To: to } }); } catch {}
+    if (!this.device || !to) return;
+    if (this.activeConnection) {
+      console.warn("[Twilio] A call is already active. Ignoring new connect request.");
+      return;
     }
+    try { this.device.connect({ params: { To: to } }); } catch {}
+  }
+
+  isCallActive() { return !!this.activeConnection; }
+
+  setHold(hold) {
+    try {
+      if (this.activeConnection && typeof this.activeConnection.mute === "function") {
+        this.activeConnection.mute(!!hold);
+      }
+    } catch {}
   }
 
   decodeJwtClaims(token) {

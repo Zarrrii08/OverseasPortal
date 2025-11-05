@@ -1,7 +1,7 @@
-// prefer Vite env variable VITE_API_BASE; fall back to the previous hardcoded URL
+// Using axios with relative URLs to work with Vite proxy
 import axios from "axios";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "";
+const API_BASE = import.meta.env.VITE_API_BASE || ""; // Use environment variable for API base URL
 
 // in-memory access token
 let accessToken = null;

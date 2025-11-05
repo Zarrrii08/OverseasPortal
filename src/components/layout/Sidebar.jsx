@@ -31,44 +31,44 @@ const menuItems = [
   //   icon: Phone,
   //   path: "/on-demand-calls",
   // },
-  { id: "finance", label: "Finance", icon: DollarSign, path: "/finance" },
-  {
-    id: "useful-links",
-    label: "Useful Links & Training",
-    icon: FolderOpen,
-    path: "/useful-links",
-  },
-  { id: "cpd", label: "CPD Course", icon: BarChart3, path: "/cpd-course" },
-  {
-    id: "policies",
-    label: "Policies & Procedure",
-    icon: FileText,
-    path: "/policies",
-  },
-  {
-    id: "profile",
-    label: "Profile & Setting",
-    icon: UserCog,
-    path: "/profile",
-  },
-  {
-    id: "screening",
-    label: "Screening & Vetting",
-    icon: Shield,
-    path: "/screening",
-  },
-  {
-    id: "enquiries",
-    label: "Enquiries & Feedback",
-    icon: MessageSquare,
-    path: "/enquiries",
-  },
-  {
-    id: "system",
-    label: "System Updates",
-    icon: Bell,
-    path: "/system-updates",
-  },
+  // { id: "finance", label: "Finance", icon: DollarSign, path: "/finance" },
+  // {
+  //   id: "useful-links",
+  //   label: "Useful Links & Training",
+  //   icon: FolderOpen,
+  //   path: "/useful-links",
+  // },
+  // { id: "cpd", label: "CPD Course", icon: BarChart3, path: "/cpd-course" },
+  // {
+  //   id: "policies",
+  //   label: "Policies & Procedure",
+  //   icon: FileText,
+  //   path: "/policies",
+  // },
+  // {
+  //   id: "profile",
+  //   label: "Profile & Setting",
+  //   icon: UserCog,
+  //   path: "/profile",
+  // },
+  // {
+  //   id: "screening",
+  //   label: "Screening & Vetting",
+  //   icon: Shield,
+  //   path: "/screening",
+  // },
+  // {
+  //   id: "enquiries",
+  //   label: "Enquiries & Feedback",
+  //   icon: MessageSquare,
+  //   path: "/enquiries",
+  // },
+  // {
+  //   id: "system",
+  //   label: "System Updates",
+  //   icon: Bell,
+  //   path: "/system-updates",
+  // },
 ];
 
 export default function Sidebar({ isOpen, onClose, onToggle }) {

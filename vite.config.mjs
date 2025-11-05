@@ -5,27 +5,18 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   return {
     plugins: [react()],
-    base: env.VITE_URL_DIR || '/',
-    envPrefix: ['VITE_'],
+    base: '/',
     build: {
-      target: 'es2018',
+      outDir: 'dist',
       sourcemap: false,
-      minify: 'esbuild',
-      cssCodeSplit: true,
-      chunkSizeWarningLimit: 1000,
-      assetsInlineLimit: 4096,
       rollupOptions: {
         output: {
           manualChunks: {
-            react: ['react', 'react-dom'],
-            vendor: [
-              'axios',
-              '@twilio/voice-sdk',
-              'react-router-dom'
-            ],
+            vendor: ['react', 'react-dom', 'react-router-dom'],
           },
         },
       },
+      chunkSizeWarningLimit: 1000,
     },
     server: {
       proxy: {
@@ -33,9 +24,9 @@ export default defineConfig(({ mode }) => {
           target: "https://odenhanced.language-empire.net",
           changeOrigin: true,
           secure: false,
-          rewrite: (path) => path,
-        },
-      },
+          rewrite: (path) => path
+        }
+      }
     },
     preview: {
       proxy: {
@@ -43,9 +34,9 @@ export default defineConfig(({ mode }) => {
           target: "https://odenhanced.language-empire.net",
           changeOrigin: true,
           secure: false,
-          rewrite: (path) => path,
-        },
-      },
-    },
+          rewrite: (path) => path
+        }
+      }
+    }
   };
 });

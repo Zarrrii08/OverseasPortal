@@ -1,6 +1,7 @@
 import React from "react";
 import { PhoneIncoming, PhoneCall, PhoneOff, Check, X } from "lucide-react";
 import { useTwilio } from "../context/TwilioContext";
+import CallDialer from "../components/CallDialer";
 
 export default function BookingsPage() {
   const {
@@ -9,6 +10,7 @@ export default function BookingsPage() {
     accepted,
     callerNumber,
     clientInfo,
+    clientInfoLoading,
     callTimeStr,
     goOnline,
     goOffline,
@@ -17,22 +19,7 @@ export default function BookingsPage() {
     disconnectAll,
   } = useTwilio();
 
-  const [phoneInput, setPhoneInput] = React.useState("");
-  const [serviceUsers, setServiceUsers] = React.useState([]);
-
-  // Clear local inputs when going offline (preserves prior behavior)
-  React.useEffect(() => {
-    if (!isOnline) {
-      setServiceUsers([]);
-      setPhoneInput("");
-    }
-  }, [isOnline]);
-
-  const addServiceUser = () => {
-    if (!phoneInput.trim()) return;
-    setServiceUsers((list) => [...list, phoneInput.trim()]);
-    setPhoneInput("");
-  };
+  // No page-local phone list state; moved into CallDialer
 
   return (
     <div className="p-6">
@@ -143,80 +130,25 @@ export default function BookingsPage() {
             <div className="bg-white rounded-lg shadow-sm border">
               <div className="p-4">
                 <h3 className="font-semibold text-gray-900 mb-3">Client Information</h3>
-                <div className="text-sm text-gray-700 flex flex-wrap items-center gap-6">
-                  <div>
-                    <span className="text-gray-600">Booking Ref:</span>
-                    <span className="ml-2 font-medium">{(clientInfo && (clientInfo.bookingRef || clientInfo.bookingReference)) || "-"}</span>
+                {clientInfoLoading ? (
+                  <div className="text-sm text-gray-500">Loading client info…</div>
+                ) : (
+                  <div className="text-sm text-gray-700 flex flex-wrap items-center gap-6">
+                    <div>
+                      <span className="text-gray-600">Booking Ref:</span>
+                      <span className="ml-2 font-medium">{(clientInfo && (clientInfo.bookingRef || clientInfo.bookingReference)) || "-"}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Language:</span>
+                      <span className="ml-2 font-medium">{(clientInfo && (clientInfo.language || clientInfo.preferredLanguage)) || "-"}</span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-gray-600">Language:</span>
-                    <span className="ml-2 font-medium">{(clientInfo && (clientInfo.language || clientInfo.preferredLanguage)) || "-"}</span>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Service user */}
-            <div className="bg-white rounded-lg shadow-sm border">
-              <div className="p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Service user</h3>
-
-                <div className="flex gap-2">
-                  <input
-                    value={phoneInput}
-                    onChange={(e) => setPhoneInput(e.target.value)}
-                    placeholder="Phone number along with country code"
-                    className="flex-1 h-10 rounded-md border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button
-                    onClick={addServiceUser}
-                    className="h-10 px-4 rounded-md bg-sky-500 hover:bg-sky-600 text-white text-sm font-medium"
-                  >
-                    Add
-                  </button>
-                  <button
-                    onClick={() => {
-                      const num = phoneInput.trim();
-                      if (!num) return;
-                      connect(num);
-                    }}
-                    className="h-10 px-4 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium inline-flex items-center gap-2"
-                  >
-                    <PhoneCall size={16} /> Call
-                  </button>
-                </div>
-
-                <div className="mt-4">
-                  <div className="text-xs uppercase text-gray-500 mb-2">Phone numbers</div>
-                  <ul className="divide-y">
-                    {serviceUsers.length === 0 && (
-                      <li className="py-3 text-sm text-gray-400">No phone numbers added</li>
-                    )}
-                    {serviceUsers.map((num, i) => (
-                      <li key={i} className="py-3 flex items-center justify-between text-sm">
-                        <span className="font-medium">{num}</span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              connect(num);
-                            }}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-white bg-emerald-500 hover:bg-emerald-600"
-                          >
-                            <Check size={14} /> Dial
-                          </button>
-                          <button
-                            onClick={() => setServiceUsers((l) => l.filter((_, idx) => idx !== i))}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-white bg-red-500 hover:bg-red-600"
-                          >
-                            <PhoneOff size={14} /> Remove
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
+            {/* Service user (refactored dialer) */}
+            <CallDialer />
           </div>
         )}
       </div>

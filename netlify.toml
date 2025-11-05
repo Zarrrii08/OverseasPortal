@@ -1,14 +1,22 @@
 # Netlify configuration for React + Vite SPA
-# Build settings
 [build]
   command = "npm run build"
   publish = "dist"
 
-# Ensure SPA routing works (serve index.html for all routes)
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    "Content-Type" = "text/html"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    "Content-Type" = "application/javascript"
 
 # Optional: Cache static assets aggressively
 [[headers]]
